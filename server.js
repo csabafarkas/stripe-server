@@ -1,10 +1,6 @@
-'use strict';
 const express = require('express');
-const serverless = require('serverless-http');
 const app = express();
-const bodyParser = require('body-parser');
 const { resolve } = require('path');
-const router = require('express-router');
 // Copy the .env.example in the root into a .env file in this folder
 require('dotenv').config({ path: './.env' });
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -127,7 +123,4 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-//app.listen(4242, () => console.log(`Node server listening on port ${4242}!`));
-
-module.exports = app;
-module.exports = serverless(app);
+app.listen(4242, () => console.log(`Node server listening on port ${4242}!`));
