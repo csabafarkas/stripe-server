@@ -36,10 +36,11 @@ app.get('/config', async (req, res) => {
       productDescription: p.description,
       id: price.id,
       images: p.images,
+      index: p.metadata ? p.metadata['index'] : 999,
     };
   });
 
-  console.log(productsWithPrices);
+  console.log(productsWithPrices[0]);
 
   res.send({
     publicKey: process.env.STRIPE_PUBLISHABLE_KEY,
@@ -50,8 +51,13 @@ app.get('/config', async (req, res) => {
 // Fetch the Checkout Session to display the JSON result on the success page
 app.get('/checkout-session', async (req, res) => {
   const { sessionId } = req.query;
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
-  res.send(session);
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    res.send(session);
+  } catch (e) {
+    res.status(404);
+    res.send('Unknown session');
+  }
 });
 
 app.post('/create-checkout-session', async (req, res) => {
@@ -63,27 +69,32 @@ app.post('/create-checkout-session', async (req, res) => {
   // [customer] - if you have an existing Stripe Customer ID
   // [customer_email] - lets you prefill the email input in the Checkout page
   // For full details see https://stripe.com/docs/api/checkout/sessions/create
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: process.env.PAYMENT_METHODS.split(', '),
+      mode: 'payment',
+      locale: locale,
+      line_items: [
+        {
+          price: id,
+          quantity: 1,
+        },
+      ],
+      // ?session_id={CHECKOUT_SESSION_ID} means the redirect will have the session ID set as a query param
+      success_url: `${
+        url ? url : domainURL
+      }/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${url ? url : domainURL}/canceled.html`,
+    });
 
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: process.env.PAYMENT_METHODS.split(', '),
-    mode: 'payment',
-    locale: locale,
-    line_items: [
-      {
-        price: id,
-        quantity: 1,
-      },
-    ],
-    // ?session_id={CHECKOUT_SESSION_ID} means the redirect will have the session ID set as a query param
-    success_url: `${
-      url ? url : domainURL
-    }/success.html?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${url ? url : domainURL}/canceled.html`,
-  });
-
-  res.send({
-    sessionId: session.id,
-  });
+    res.send({
+      sessionId: session.id,
+    });
+  } catch (e) {
+    console.log('hello');
+    res.status = 401;
+    res.send({ message: 'Unauthorized' });
+  }
 });
 
 // Webhook handler for asynchronous events.
